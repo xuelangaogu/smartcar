@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}智能车竞赛视频平台{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="logo">智</span>
+      <span>智能车竞赛 · 完全模型组视频平台</span>
+    </a>
+    <nav>
+      <a href="{{ url_for('index') }}">用户端</a>
+      {% if session.get('is_admin') %}
+        <a href="{{ url_for('admin_dashboard') }}">管理后台</a>
+        <a href="{{ url_for('annotate') }}">数据标注</a>
+        <a href="{{ url_for('admin_logout') }}">退出</a>
+      {% else %}
+        <a href="{{ url_for('admin_login') }}">管理员登录</a>
+      {% endif %}
+    </nav>
+  </div>
+  {% block body %}{% endblock %}
+  <div class="toast" id="toast"></div>
+  <script>
+    function showToast(msg, isErr) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (isErr ? ' err' : '');
+      setTimeout(function () { t.className = 'toast'; }, 2600);
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

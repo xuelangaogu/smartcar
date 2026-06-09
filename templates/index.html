@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}视频上传 · 智能车竞赛平台{% endblock %}
+{% block body %}
+<div class="container">
+  <div class="hero">
+    <h1>车体视频上传</h1>
+    <p>支持最大 600MB 视频 · 最多保留一个 · 可随时替换</p>
+  </div>
+
+  <div class="card">
+    <form id="upForm">
+      <div class="dropzone" id="dropzone">
+        <div class="big">⬆️</div>
+        <div><b>点击选择</b> 或拖拽视频到此处</div>
+        <div class="hint">支持 mp4 / avi / mov / mkv 等格式，单文件不超过 600MB</div>
+        <input type="file" id="fileInput" name="video" accept="video/*" style="display:none" />
+      </div>
+      <div id="fileName" class="meta" style="display:none"></div>
+      <div class="progress" id="progressWrap" style="display:none"><div id="progressBar"></div></div>
+      <div style="margin-top:18px; display:flex; gap:12px;">
+        <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>开始上传</button>
+        <button type="button" class="btn" id="resetBtn">重新选择</button>
+      </div>
+    </form>
+
+    {% if current %}
+    <div class="current-video">
+      <div class="section-title">当前视频</div>
+      <video src="{{ url_for('media', video_id=current.id) }}" controls preload="metadata"></video>
+      <div class="meta">
+        <span>文件名: <b>{{ current.original_name }}</b></span>
+        <span>大小: <b>{{ current.size_h }}</b></span>
+        {% if current.duration %}<span>时长: <b>{{ '%.1f'|format(current.duration) }} 秒</b></span>{% endif %}
+        <span>上传时间: <b>{{ current.uploaded_at }}</b></span>
+      </div>
+      <p class="hint" style="color:var(--muted); font-size:13px; margin-top:10px;">再次上传将替换当前视频。</p>
+    </div>
+    {% else %}
+    <div class="current-video"><div class="empty">还没有上传任何视频</div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var MAX = 600 * 1024 * 1024;
+  var dz = document.getElementById('dropzone');
+  var fi = document.getElementById('fileInput');
+  var nameEl = document.getElementById('fileName');
+  var btn = document.getElementById('uploadBtn');
+  var pw = document.getElementById('progressWrap');
+  var pb = document.getElementById('progressBar');
+
+  dz.addEventListener('click', function () { fi.click(); });
+  ['dragover', 'dragenter'].forEach(function (e) {
+    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.classList.add('drag'); });
+  });
+  ['dragleave', 'drop'].forEach(function (e) {
+    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.classList.remove('drag'); });
+  });
+  dz.addEventListener('drop', function (ev) {
+    if (ev.dataTransfer.files.length) { fi.files = ev.dataTransfer.files; onPick(); }
+  });
+  fi.addEventListener('change', onPick);
+
+  function fmt(n) {
+    var u = ['B', 'KB', 'MB', 'GB'];
+    var i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return n.toFixed(1) + ' ' + u[i];
+  }
+
+  function onPick() {
+    var f = fi.files[0];
+    if (!f) return;
+    if (f.size > MAX) {
+      showToast('文件超过 600MB 限制 (' + fmt(f.size) + ')', true);
+      fi.value = ''; btn.disabled = true; nameEl.style.display = 'none';
+      return;
+    }
+    nameEl.style.display = 'flex';
+    nameEl.innerHTML = '<span>已选择: <b>' + f.name + '</b> (' + fmt(f.size) + ')</span>';
+    btn.disabled = false;
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    fi.value = ''; btn.disabled = true; nameEl.style.display = 'none';
+  });
+
+  document.getElementById('upForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var f = fi.files[0];
+    if (!f) { showToast('请先选择视频', true); return; }
+    var fd = new FormData();
+    fd.append('video', f);
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '{{ url_for("upload") }}');
+    btn.disabled = true; pw.style.display = 'block';
+    xhr.upload.onprogress = function (ev) {
+      if (ev.lengthComputable) { pb.style.width = (ev.loaded / ev.total * 100).toFixed(1) + '%'; }
+    };
+    xhr.onload = function () {
+      if (xhr.status === 200) {
+        showToast('上传成功');
+        setTimeout(function () { location.reload(); }, 700);
+      } else {
+        var msg = '上传失败';
+        try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+        showToast(msg, true); btn.disabled = false; pw.style.display = 'none';
+      }
+    };
+    xhr.onerror = function () { showToast('网络错误，上传失败', true); btn.disabled = false; };
+    xhr.send(fd);
+  });
+</script>
+{% endblock %}

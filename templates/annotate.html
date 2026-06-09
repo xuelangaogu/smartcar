@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}数据标注平台{% endblock %}
+{% block body %}
+<div class="annot-root">
+  <!-- 左: 图像列表 -->
+  <div class="annot-col">
+    <div class="annot-head">
+      <span>图像列表 (<span id="frameCount">0</span>)</span>
+      <select id="filterSel" style="width:auto; padding:4px 6px; font-size:12px;">
+        <option value="all">全部</option>
+        <option value="todo">未标注</option>
+        <option value="done">已标注</option>
+      </select>
+    </div>
+    <div id="frameList"></div>
+  </div>
+
+  <!-- 中: 画布 -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="canvas-toolbar">
+      <div class="tool-btn active" data-tool="select" title="选择/移动 (V)">🖱️</div>
+      <div class="tool-btn" data-tool="rectangle" title="矩形框 (R)">▭</div>
+      <div class="tool-btn" data-tool="polygon" title="多边形 (P)">⬡</div>
+      <div class="tool-btn" data-tool="point" title="关键点 (O)">•</div>
+      <div class="tool-btn" data-tool="line" title="线段 (L)">／</div>
+    </div>
+    <canvas id="annotCanvas"></canvas>
+    <div class="canvas-bottom">
+      <button class="btn btn-sm" id="prevBtn">← 上一张</button>
+      <span id="curName" style="min-width:160px; text-align:center;">未选择图像</span>
+      <button class="btn btn-sm" id="nextBtn">下一张 →</button>
+      <span style="margin-left:8px;">缩放</span>
+      <button class="btn btn-sm" id="zoomOut">−</button>
+      <span id="zoomLabel">100%</span>
+      <button class="btn btn-sm" id="zoomIn">+</button>
+      <button class="btn btn-sm" id="zoomFit">适应</button>
+    </div>
+  </div>
+
+  <!-- 右: 标签 + 形状 -->
+  <div class="annot-col">
+    <div class="annot-head">标签管理</div>
+    <div class="add-label">
+      <input type="text" id="newLabelName" placeholder="新标签名" />
+      <input type="color" id="newLabelColor" value="#e6194b" />
+      <button class="btn btn-sm btn-primary" id="addLabelBtn">添加</button>
+    </div>
+    <div id="labelList"></div>
+
+    <div class="annot-head" style="border-top:1px solid var(--border);">当前图像标注 (<span id="shapeCount">0</span>)</div>
+    <div id="shapeList"></div>
+
+    <div class="annot-actions">
+      <button class="btn btn-primary" id="saveBtn">保存标注 (Ctrl+S)</button>
+      <a class="btn btn-green" href="{{ url_for('admin_export_dataset') }}">导出数据集</a>
+    </div>
+    <div class="kbd-hint">
+      快捷键：<br />
+      <kbd>V</kbd> 选择　<kbd>R</kbd> 矩形　<kbd>P</kbd> 多边形<br />
+      <kbd>O</kbd> 点　<kbd>L</kbd> 线　<kbd>Del</kbd> 删除选中<br />
+      <kbd>Enter</kbd> 完成多边形　<kbd>Esc</kbd> 取消<br />
+      <kbd>Ctrl+S</kbd> 保存　<kbd>←</kbd>/<kbd>→</kbd> 切换图像<br />
+      滚轮缩放，按住右键拖动平移
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.SMARTCAR = {
+    framesUrl: "{{ url_for('api_frames') }}",
+    labelsUrl: "{{ url_for('api_labels') }}",
+    annUrlBase: "/api/annotation"
+  };
+</script>
+<script src="{{ url_for('static', filename='js/annotate.js') }}"></script>
+{% endblock %}

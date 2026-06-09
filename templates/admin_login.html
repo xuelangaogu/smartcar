@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}管理员登录{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <div class="card login-card">
+    <h2>管理员登录</h2>
+    <div class="sub">智能车竞赛视频平台 · 后台管理入口</div>
+    {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
+    <form method="post">
+      <div class="field">
+        <label>用户名</label>
+        <input class="input" type="text" name="username" autocomplete="username" required autofocus />
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input class="input" type="password" name="password" autocomplete="current-password" required />
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%; justify-content:center;">登录</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
