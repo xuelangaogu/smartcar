@@ -1,0 +1,19 @@
+# 运行时数据 (不纳入版本控制)
+uploads/
+frames/
+annotations/
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

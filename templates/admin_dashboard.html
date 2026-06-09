@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}管理后台{% endblock %}
+{% block body %}
+<div class="container-wide">
+  <div class="hero" style="text-align:left; margin-bottom:20px;">
+    <h1 style="font-size:24px;">管理后台</h1>
+    <p>查看所有视频 · 批量切分图像 · 导出数据集</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">{{ team_count }}</div><div class="l">注册队伍</div></div>
+    <div class="stat"><div class="n">{{ videos|length }}</div><div class="l">视频数量</div></div>
+    <div class="stat"><div class="n">{{ total_frames }}</div><div class="l">已切分图像</div></div>
+    <div class="stat"><div class="n"><a href="{{ url_for('annotate') }}">标注 →</a></div><div class="l">进入标注平台</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="field" style="margin-bottom:0;">
+      <label>切分间隔时长 (秒/帧)</label>
+      <input class="input" type="number" id="interval" value="1" min="0.1" step="0.1" style="width:160px;" />
+    </div>
+    <button class="btn btn-primary" id="splitAllBtn">批量切分全部视频</button>
+    <a class="btn btn-green" href="{{ url_for('admin_export_images') }}">一键导出图像数据集</a>
+    <a class="btn" href="{{ url_for('admin_export_dataset') }}">导出图像+标注数据集</a>
+  </div>
+
+  <div class="progress" id="splitProgressWrap" style="display:none; margin-bottom:8px;"><div id="splitProgressBar"></div></div>
+  <div id="splitMsg" class="hint" style="color:var(--muted); font-size:13px; margin-bottom:16px;"></div>
+
+  {% if videos %}
+  <table>
+    <thead>
+      <tr><th>队伍</th><th>学校</th><th>文件名</th><th>大小</th><th>时长</th><th>已切分图像</th><th>间隔</th><th>上传时间</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+      {% for v in videos %}
+      <tr>
+        <td><b>{{ v.team_name or '-' }}</b></td>
+        <td>{{ v.school or '-' }}</td>
+        <td>{{ v.original_name }}</td>
+        <td>{{ v.size_h }}</td>
+        <td>{% if v.duration %}{{ '%.1f'|format(v.duration) }}s{% else %}-{% endif %}</td>
+        <td>
+          {% if v.frame_count %}<span class="tag tag-ok">{{ v.frame_count }} 张</span>
+          {% else %}<span class="tag tag-no">未切分</span>{% endif %}
+        </td>
+        <td>{% if v.interval %}{{ v.interval }}s{% else %}-{% endif %}</td>
+        <td>{{ v.uploaded_at }}</td>
+        <td>
+          <button class="btn btn-sm splitOne" data-id="{{ v.id }}">切分</button>
+          <a class="btn btn-sm" href="{{ url_for('annotate') }}">标注</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="card"><div class="empty">还没有任何视频，请队伍先在 <a href="{{ url_for('login') }}">队伍入口</a> 注册并上传</div></div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var pollTimer = null;
+  function getInterval() {
+    var v = parseFloat(document.getElementById('interval').value);
+    if (!v || v <= 0) { showToast('请输入有效的间隔时长', true); return null; }
+    return v;
+  }
+
+  function startSplit(scope) {
+    var interval = getInterval();
+    if (interval === null) return;
+    var fd = new FormData();
+    fd.append('interval', interval);
+    fd.append('scope', scope);
+    fetch('{{ url_for("admin_split") }}', { method: 'POST', body: fd })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { showToast(res.d.error || '切分失败', true); return; }
+        showToast('已开始切分 ' + res.d.total + ' 个视频');
+        document.getElementById('splitProgressWrap').style.display = 'block';
+        poll();
+      })
+      .catch(function () { showToast('请求失败', true); });
+  }
+
+  function poll() {
+    if (pollTimer) clearTimeout(pollTimer);
+    fetch('{{ url_for("admin_split_progress") }}')
+      .then(function (r) { return r.json(); })
+      .then(function (p) {
+        var pct = p.total ? (p.done / p.total * 100) : 0;
+        document.getElementById('splitProgressBar').style.width = pct.toFixed(1) + '%';
+        document.getElementById('splitMsg').textContent =
+          p.message + (p.total ? ' (' + p.done + '/' + p.total + ')' : '');
+        if (p.running) { pollTimer = setTimeout(poll, 800); }
+        else {
+          document.getElementById('splitMsg').textContent = '切分完成，正在刷新...';
+          setTimeout(function () { location.reload(); }, 900);
+        }
+      });
+  }
+
+  document.getElementById('splitAllBtn').addEventListener('click', function () { startSplit('all'); });
+  document.querySelectorAll('.splitOne').forEach(function (b) {
+    b.addEventListener('click', function () { startSplit(b.dataset.id); });
+  });
+</script>
+{% endblock %}
