@@ -21,6 +21,15 @@
         <label>学校名称</label>
         <input class="input" type="text" name="school" value="{{ school or '' }}" required />
       </div>
+      <div class="field">
+        <label>验证码</label>
+        <div class="captcha-row">
+          <input class="input" type="text" name="captcha" maxlength="4" autocomplete="off"
+                 placeholder="请输入图中字符" required style="flex:1;" />
+          <img class="captcha-img" src="{{ url_for('captcha') }}" alt="验证码"
+               title="点击刷新" onclick="this.src='{{ url_for('captcha') }}?t=' + Date.now();" />
+        </div>
+      </div>
       <button class="btn btn-primary" type="submit" style="width:100%; justify-content:center;">登录</button>
     </form>
 

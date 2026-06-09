@@ -12,6 +12,7 @@
 
 import json
 import os
+import random
 import shutil
 import threading
 import uuid
@@ -33,6 +34,7 @@ from flask import (
     session,
     url_for,
 )
+from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -176,6 +178,74 @@ def purge_video(videos, video_id):
 
 
 # ----------------------------------------------------------------------------
+# 验证码 (字母数字, 每次登录校验)
+# ----------------------------------------------------------------------------
+CAPTCHA_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 去除易混淆字符 0O1IL
+CAPTCHA_LEN = 4
+
+
+def _load_captcha_font(size):
+    for path in (
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ):
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except OSError:
+                continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _render_captcha(code):
+    """生成验证码 PNG 图像 (字母数字 + 干扰线/噪点)。"""
+    width, height = 130, 48
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    font = _load_captcha_font(30)
+    for _ in range(6):
+        x1, y1 = random.randint(0, width), random.randint(0, height)
+        x2, y2 = random.randint(0, width), random.randint(0, height)
+        draw.line([(x1, y1), (x2, y2)], fill=(random.randint(160, 220),) * 3, width=1)
+    for _ in range(120):
+        draw.point(
+            (random.randint(0, width), random.randint(0, height)),
+            fill=(random.randint(150, 210),) * 3,
+        )
+    step = width // (CAPTCHA_LEN + 1)
+    for i, ch in enumerate(code):
+        color = (random.randint(0, 90), random.randint(0, 90), random.randint(90, 180))
+        y = random.randint(2, 10)
+        draw.text((8 + i * step, y), ch, font=font, fill=color)
+    buf = BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+    return buf
+
+
+@app.route("/captcha")
+def captcha():
+    code = "".join(random.choice(CAPTCHA_CHARS) for _ in range(CAPTCHA_LEN))
+    session["captcha"] = code.upper()
+    resp = send_file(_render_captcha(code), mimetype="image/png")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+def check_captcha(value):
+    """校验用户输入的验证码 (不区分大小写), 校验后立即失效。"""
+    expected = session.pop("captcha", None)
+    if not expected:
+        return False
+    return (value or "").strip().upper() == expected
+
+
+# ----------------------------------------------------------------------------
 # 认证
 # ----------------------------------------------------------------------------
 def admin_required(f):
@@ -233,6 +303,9 @@ def login():
     if request.method == "POST":
         team_name = (request.form.get("team_name") or "").strip()
         school = (request.form.get("school") or "").strip()
+        if not check_captcha(request.form.get("captcha")):
+            return render_template("auth.html", login_error="验证码错误, 请重新输入",
+                                   team_name=team_name, school=school, tab="login")
         teams = load_teams()
         match = None
         for t in teams.values():
@@ -349,11 +422,14 @@ def admin_login():
     if request.method == "POST":
         username = request.form.get("username", "")
         password = request.form.get("password", "")
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        if not check_captcha(request.form.get("captcha")):
+            error = "验证码错误, 请重新输入"
+        elif username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session["is_admin"] = True
             nxt = request.args.get("next") or url_for("admin_dashboard")
             return redirect(nxt)
-        error = "用户名或密码错误"
+        else:
+            error = "用户名或密码错误"
     return render_template("admin_login.html", error=error)
 
 

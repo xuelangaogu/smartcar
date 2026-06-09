@@ -200,3 +200,11 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
 .annot-actions { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 .kbd-hint { padding: 10px 14px; font-size: 12px; color: var(--muted); line-height: 1.8; border-top: 1px solid var(--border); }
 .kbd-hint kbd { background: var(--soft); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+
+/* 验证码 */
+.captcha-row { display: flex; align-items: center; gap: 10px; }
+.captcha-img {
+  height: 42px; width: 130px; border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; background: #fff; flex: none;
+}
+.captcha-img:hover { border-color: var(--primary); }
