@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}队伍登录 / 注册{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <div class="card login-card" style="width:400px;">
+    <h2>智能车竞赛 · 队伍入口</h2>
+    <div class="sub">使用「队伍名称 + 学校名称」作为登录凭证</div>
+
+    <div style="display:flex; gap:8px; margin-bottom:18px;">
+      <button class="btn tab-btn" data-tab="login" style="flex:1; justify-content:center;">登录</button>
+      <button class="btn tab-btn" data-tab="register" style="flex:1; justify-content:center;">注册队伍</button>
+    </div>
+
+    <form method="post" action="{{ url_for('login') }}" id="loginForm" class="auth-pane">
+      {% if login_error %}<div class="error-msg">{{ login_error }}</div>{% endif %}
+      <div class="field">
+        <label>队伍名称</label>
+        <input class="input" type="text" name="team_name" value="{{ team_name or '' }}" required />
+      </div>
+      <div class="field">
+        <label>学校名称</label>
+        <input class="input" type="text" name="school" value="{{ school or '' }}" required />
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%; justify-content:center;">登录</button>
+    </form>
+
+    <form method="post" action="{{ url_for('register') }}" id="registerForm" class="auth-pane" style="display:none;">
+      {% if reg_error %}<div class="error-msg">{{ reg_error }}</div>{% endif %}
+      <div class="field">
+        <label>队伍名称</label>
+        <input class="input" type="text" name="team_name" value="{{ team_name or '' }}" required />
+      </div>
+      <div class="field">
+        <label>学校名称</label>
+        <input class="input" type="text" name="school" value="{{ school or '' }}" required />
+      </div>
+      <button class="btn btn-green" type="submit" style="width:100%; justify-content:center;">注册并进入</button>
+      <p class="hint" style="color:var(--muted); font-size:12px; margin-top:10px;">注册后即可上传一个车体视频，可随时替换，数据持久化保存。</p>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function setTab(tab) {
+    document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+    document.querySelectorAll('.tab-btn').forEach(function (b) {
+      var on = b.dataset.tab === tab;
+      b.classList.toggle('btn-primary', on);
+    });
+  }
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    b.addEventListener('click', function () { setTab(b.dataset.tab); });
+  });
+  setTab('{{ tab or "login" }}');
+</script>
+{% endblock %}

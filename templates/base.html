@@ -14,12 +14,15 @@
       <span>智能车竞赛 · 完全模型组视频平台</span>
     </a>
     <nav>
-      <a href="{{ url_for('index') }}">用户端</a>
       {% if session.get('is_admin') %}
         <a href="{{ url_for('admin_dashboard') }}">管理后台</a>
         <a href="{{ url_for('annotate') }}">数据标注</a>
-        <a href="{{ url_for('admin_logout') }}">退出</a>
+        <a href="{{ url_for('admin_logout') }}">退出管理员</a>
+      {% elif session.get('team_id') %}
+        <span style="color:var(--muted); font-size:14px;">队伍：<b style="color:var(--text);">{{ session.get('team_name') }}</b></span>
+        <a href="{{ url_for('logout') }}">退出</a>
       {% else %}
+        <a href="{{ url_for('login') }}">队伍登录</a>
         <a href="{{ url_for('admin_login') }}">管理员登录</a>
       {% endif %}
     </nav>

@@ -4,18 +4,19 @@
 
 ## 功能概览
 
-### 用户端（`/`）
-- 白色风格的视频上传界面，支持拖拽上传
+### 用户端（队伍入口 `/login`、`/register`）
+- **队伍注册制**：以「队伍名称 + 学校名称」作为登录凭证，注册信息持久化保存（`data/teams.json`）
+- 登录后进入白色风格的视频上传界面，支持拖拽上传
 - 单文件最大 **600MB**
-- **最多保留一个视频**，再次上传自动替换
-- 上传后可在线预览当前视频
+- **每支队伍保留一个视频**，再次上传自动替换；数据持久化保存
+- 上传后可在线预览当前队伍的视频
 
 ### 管理员端（`/admin`）
 - 独立登录入口（`/admin/login`），账号 **hurry** / 密码 **123321**
-- 查看所有已上传视频（大小、时长、切分状态等）
+- 查看所有队伍已上传视频（队伍、学校、大小、时长、切分状态等）
 - **批量切分**：可设置间隔时长（秒/帧），一键切分全部视频为图像帧
 - 单个视频切分、实时切分进度
-- **一键导出图像数据集**：打包所有图像为 zip（`images/` 文件夹）
+- **一键导出图像数据集**：打包所有图像为 zip（`images/` 文件夹），文件名含队伍/学校前缀，跨队伍唯一不冲突
 - 导出图像 + 标注的完整数据集（含 LabelMe 风格 JSON 与 `labels.txt`）
 
 ### 数据标注平台（`/admin/annotate`，类 LabelMe）
@@ -29,7 +30,7 @@
 
 ## 环境要求
 - Python 3.10+
-- [FFmpeg](https://ffmpeg.org/)（用于视频切分，需在 `PATH` 中可用）
+- **无需安装系统 FFmpeg**：视频时长读取与切分均使用 OpenCV（`opencv-python-headless`，其 wheel 自带解码器）
 
 ## 安装与运行
 
@@ -51,9 +52,10 @@ static/js/annotate.js  # 标注引擎
 uploads/               # 上传的视频（运行时生成，已 gitignore）
 frames/                # 切分出的图像（运行时生成）
 annotations/           # 标注 JSON（运行时生成）
-data/                  # 元数据（videos.json / labels.json）
+data/                  # 元数据（teams.json / videos.json / labels.json）
 ```
 
 ## 说明
-- 视频切分使用 FFmpeg 的 `fps=1/间隔` 抽帧，输出 JPG。
+- 视频时长与切分均使用 **OpenCV**（`cv2.VideoCapture` 按 `fps×间隔` 抽帧，`cv2.imencode` 输出 JPG），无需系统安装 FFmpeg。
+- 外部解码失败时优雅降级（时长记为空、切分返回 0 帧），不再抛 500。
 - 管理员密钥可通过环境变量 `SMARTCAR_SECRET_KEY` 配置 session 加密。

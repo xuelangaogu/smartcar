@@ -8,6 +8,7 @@
   </div>
 
   <div class="stats">
+    <div class="stat"><div class="n">{{ team_count }}</div><div class="l">注册队伍</div></div>
     <div class="stat"><div class="n">{{ videos|length }}</div><div class="l">视频数量</div></div>
     <div class="stat"><div class="n">{{ total_frames }}</div><div class="l">已切分图像</div></div>
     <div class="stat"><div class="n"><a href="{{ url_for('annotate') }}">标注 →</a></div><div class="l">进入标注平台</div></div>
@@ -29,12 +30,14 @@
   {% if videos %}
   <table>
     <thead>
-      <tr><th>文件名</th><th>大小</th><th>时长</th><th>已切分图像</th><th>间隔</th><th>上传时间</th><th>操作</th></tr>
+      <tr><th>队伍</th><th>学校</th><th>文件名</th><th>大小</th><th>时长</th><th>已切分图像</th><th>间隔</th><th>上传时间</th><th>操作</th></tr>
     </thead>
     <tbody>
       {% for v in videos %}
       <tr>
-        <td><b>{{ v.original_name }}</b></td>
+        <td><b>{{ v.team_name or '-' }}</b></td>
+        <td>{{ v.school or '-' }}</td>
+        <td>{{ v.original_name }}</td>
         <td>{{ v.size_h }}</td>
         <td>{% if v.duration %}{{ '%.1f'|format(v.duration) }}s{% else %}-{% endif %}</td>
         <td>
@@ -52,7 +55,7 @@
     </tbody>
   </table>
   {% else %}
-  <div class="card"><div class="empty">还没有任何视频，请到 <a href="{{ url_for('index') }}">用户端</a> 上传</div></div>
+  <div class="card"><div class="empty">还没有任何视频，请队伍先在 <a href="{{ url_for('login') }}">队伍入口</a> 注册并上传</div></div>
   {% endif %}
 </div>
 {% endblock %}
