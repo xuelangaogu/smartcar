@@ -47,6 +47,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 VIDEOS_JSON = os.path.join(DATA_DIR, "videos.json")
 LABELS_JSON = os.path.join(DATA_DIR, "labels.json")
 TEAMS_JSON = os.path.join(DATA_DIR, "teams.json")
+EXCLUDED_JSON = os.path.join(DATA_DIR, "excluded.json")
 
 MAX_CONTENT_LENGTH = 600 * 1024 * 1024  # 600 MB
 ALLOWED_EXT = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".webm", ".m4v", ".mpeg", ".mpg"}
@@ -123,6 +124,19 @@ def load_labels():
 
 def save_labels(labels):
     save_json(LABELS_JSON, labels)
+
+
+def excl_key(video_id, frame):
+    return f"{video_id}/{frame}"
+
+
+def load_excluded():
+    """返回被标记为「不导出/已删除」的图像键集合。"""
+    return set(load_json(EXCLUDED_JSON, []))
+
+
+def save_excluded(keys):
+    save_json(EXCLUDED_JSON, sorted(keys))
 
 
 def human_size(num):
@@ -596,11 +610,14 @@ def _export_base(info, vid):
 def admin_export_images():
     """导出整个图像数据集为 zip (一个 images 文件夹, 包含所有图像)。"""
     videos = load_videos()
+    excluded = load_excluded()
     mem = BytesIO()
     with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
         for vid, info in videos.items():
             base = _export_base(info, vid)
             for frame in frames_for(vid):
+                if excl_key(vid, frame) in excluded:
+                    continue
                 src = os.path.join(FRAMES_DIR, vid, frame)
                 zf.write(src, os.path.join("images", f"{base}__{frame}"))
     mem.seek(0)
@@ -618,11 +635,14 @@ def admin_export_images():
 def admin_export_dataset():
     """导出图像 + 标注 (LabelMe 风格 json) 的完整数据集。"""
     videos = load_videos()
+    excluded = load_excluded()
     mem = BytesIO()
     with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
         for vid, info in videos.items():
             base = _export_base(info, vid)
             for frame in frames_for(vid):
+                if excl_key(vid, frame) in excluded:
+                    continue
                 src = os.path.join(FRAMES_DIR, vid, frame)
                 stem = os.path.splitext(frame)[0]
                 zf.write(src, os.path.join("images", f"{base}__{frame}"))
@@ -654,6 +674,7 @@ def annotate():
 def api_frames():
     """返回所有可标注的帧 (跨所有队伍/视频)。"""
     videos = load_videos()
+    excluded = load_excluded()
     result = []
     for v in sorted(videos.values(), key=lambda x: x["uploaded_at"]):
         vid = v["id"]
@@ -673,9 +694,28 @@ def api_frames():
                     "url": url_for("admin_frame", video_id=vid, frame=frame),
                     "annotated": n_shapes > 0,
                     "shapes": n_shapes,
+                    "excluded": excl_key(vid, frame) in excluded,
                 }
             )
     return jsonify({"frames": result, "count": len(result)})
+
+
+@app.route("/api/exclude/<video_id>/<frame>", methods=["POST"])
+@admin_required
+def api_exclude(video_id, frame):
+    """标记/取消标记某图像为「删除(不作为数据集导出)」。"""
+    videos = load_videos()
+    if video_id not in videos:
+        return jsonify({"error": "视频不存在"}), 404
+    data = request.get_json(silent=True) or {}
+    excluded = load_excluded()
+    key = excl_key(video_id, frame)
+    if data.get("excluded"):
+        excluded.add(key)
+    else:
+        excluded.discard(key)
+    save_excluded(excluded)
+    return jsonify({"ok": True, "excluded": key in excluded})
 
 
 @app.route("/api/labels", methods=["GET", "POST", "DELETE"])
