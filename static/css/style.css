@@ -141,6 +141,24 @@ a:hover { text-decoration: underline; }
   content: ""; position: absolute; left: 5px; top: 11px; width: 4px; height: 4px;
   background: var(--primary); border-radius: 50%;
 }
+.tips-intro {
+  margin: 0 0 16px; font-size: 13px; color: var(--muted); line-height: 1.7;
+  background: var(--soft); border: 1px solid var(--border); border-left: 3px solid var(--primary);
+  border-radius: 8px; padding: 12px 14px;
+}
+.tips-sub { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.tips-ol { margin: 0 0 14px; padding-left: 0; list-style: none; counter-reset: tips; }
+.tips-ol li {
+  position: relative; counter-increment: tips; padding-left: 30px; margin-bottom: 12px;
+  font-size: 13px; color: var(--muted); line-height: 1.7;
+}
+.tips-ol li b { color: var(--text); }
+.tips-ol li::before {
+  content: counter(tips); position: absolute; left: 0; top: 1px;
+  width: 20px; height: 20px; display: grid; place-items: center;
+  background: var(--primary); color: #fff; border-radius: 50%;
+  font-size: 11px; font-weight: 700;
+}
 
 .video-card { margin-top: 20px; }
 .vc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
