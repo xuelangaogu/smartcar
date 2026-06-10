@@ -73,6 +73,83 @@ a:hover { text-decoration: underline; }
 .hero { text-align: center; margin-bottom: 28px; }
 .hero h1 { font-size: 30px; margin: 0 0 8px; }
 .hero p { color: var(--muted); margin: 0; }
+.hero-badge {
+  display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  color: var(--primary); background: #eef4ff; border: 1px solid #d8e4ff;
+  padding: 4px 12px; border-radius: 20px; margin-bottom: 14px;
+}
+.hero-team { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px !important; }
+.hero-team .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--soft); border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; color: var(--text);
+}
+.hero-team .chip-k { color: var(--muted); font-weight: 500; }
+.hero-sub { font-size: 13px; }
+
+/* ---------------- 上传页 ---------------- */
+.upload-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 820px) { .upload-grid { grid-template-columns: 1fr; } }
+.upload-card { padding: 22px; }
+
+.dz-icon {
+  width: 76px; height: 76px; margin: 0 auto 14px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--primary);
+  background: #eef4ff; border: 1px solid #dce8ff;
+}
+.dropzone.drag .dz-icon { background: #dfeaff; }
+.dz-title { font-size: 15px; }
+.dz-formats { display: flex; justify-content: center; gap: 6px; margin: 12px 0 4px; }
+.dz-formats span {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px;
+}
+
+.file-pill {
+  display: flex; align-items: center; gap: 10px; margin-top: 16px;
+  background: var(--soft); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+}
+.file-pill .fp-ico { color: var(--primary); display: grid; place-items: center; flex: none; }
+.file-pill .fp-text { flex: 1; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-pill .fp-text b { color: var(--text); }
+.file-pill .fp-x {
+  border: none; background: none; color: var(--muted); font-size: 20px; line-height: 1;
+  cursor: pointer; padding: 0 4px; border-radius: 6px;
+}
+.file-pill .fp-x:hover { color: var(--red); background: #fff; }
+
+.progress { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.progress-bar { flex: 1; height: 10px; background: #eef0f3; border-radius: 6px; overflow: hidden; }
+.progress-bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--primary), #5b8bff); transition: width .2s; }
+.progress-pct { font-size: 13px; font-weight: 700; color: var(--primary); min-width: 38px; text-align: right; }
+
+.upload-actions { margin-top: 18px; display: flex; gap: 12px; }
+.btn-lg { padding: 11px 22px; font-size: 15px; }
+
+.tips-card { padding: 22px; }
+.tips-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+.tips-list { margin: 0; padding-left: 0; list-style: none; }
+.tips-list li {
+  position: relative; padding-left: 24px; margin-bottom: 12px; font-size: 13px; color: var(--muted); line-height: 1.6;
+}
+.tips-list li b { color: var(--text); }
+.tips-list li::before {
+  content: ""; position: absolute; left: 0; top: 7px; width: 14px; height: 14px;
+  background: #eef4ff; border: 1px solid #c9ddff; border-radius: 50%;
+}
+.tips-list li::after {
+  content: ""; position: absolute; left: 5px; top: 11px; width: 4px; height: 4px;
+  background: var(--primary); border-radius: 50%;
+}
+
+.video-card { margin-top: 20px; }
+.vc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px; }
+.mg-item { background: var(--soft); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; }
+.mg-l { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+.mg-v { font-size: 14px; font-weight: 600; word-break: break-all; }
+.replace-hint { color: var(--muted); font-size: 13px; margin-top: 14px; margin-bottom: 0; }
+.empty-ico { width: 60px; height: 60px; margin: 0 auto 14px; border-radius: 50%; display: grid; place-items: center; color: #c2c8d0; background: var(--soft); }
 
 .btn {
   display: inline-flex;

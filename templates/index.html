@@ -1,45 +1,97 @@
 {% extends "base.html" %}
 {% block title %}视频上传 · 智能车竞赛平台{% endblock %}
 {% block body %}
-<div class="container">
+<div class="container upload-page">
   <div class="hero">
+    <div class="hero-badge">完全模型组 · 车体视频</div>
     <h1>车体视频上传</h1>
-    <p>队伍：<b>{{ team.team_name }}</b> · 学校：<b>{{ team.school }}</b></p>
-    <p>支持最大 600MB 视频 · 每队保留一个 · 可随时替换</p>
+    <p class="hero-team">
+      <span class="chip"><span class="chip-k">队伍</span>{{ team.team_name }}</span>
+      <span class="chip"><span class="chip-k">学校</span>{{ team.school }}</span>
+    </p>
+    <p class="hero-sub">支持最大 600MB · 每队保留一个 · 可随时替换</p>
   </div>
 
-  <div class="card">
-    <form id="upForm">
-      <div class="dropzone" id="dropzone">
-        <div class="big">⬆️</div>
-        <div><b>点击选择</b> 或拖拽视频到此处</div>
-        <div class="hint">支持 mp4 / avi / mov / mkv 等格式，单文件不超过 600MB</div>
-        <input type="file" id="fileInput" name="video" accept="video/*" style="display:none" />
-      </div>
-      <div id="fileName" class="meta" style="display:none"></div>
-      <div class="progress" id="progressWrap" style="display:none"><div id="progressBar"></div></div>
-      <div style="margin-top:18px; display:flex; gap:12px;">
-        <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>开始上传</button>
-        <button type="button" class="btn" id="resetBtn">重新选择</button>
-      </div>
-    </form>
+  <div class="upload-grid">
+    <div class="card upload-card">
+      <form id="upForm">
+        <div class="dropzone" id="dropzone">
+          <div class="dz-icon">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </div>
+          <div class="dz-title"><b>点击选择</b> 或将视频拖拽到此处</div>
+          <div class="dz-formats">
+            <span>MP4</span><span>AVI</span><span>MOV</span><span>MKV</span>
+          </div>
+          <div class="hint">单个文件不超过 600MB</div>
+          <input type="file" id="fileInput" name="video" accept="video/*" style="display:none" />
+        </div>
 
-    {% if current %}
-    <div class="current-video">
-      <div class="section-title">当前视频</div>
-      <video src="{{ url_for('media', video_id=current.id) }}" controls preload="metadata"></video>
-      <div class="meta">
-        <span>文件名: <b>{{ current.original_name }}</b></span>
-        <span>大小: <b>{{ current.size_h }}</b></span>
-        {% if current.duration %}<span>时长: <b>{{ '%.1f'|format(current.duration) }} 秒</b></span>{% endif %}
-        <span>上传时间: <b>{{ current.uploaded_at }}</b></span>
-      </div>
-      <p class="hint" style="color:var(--muted); font-size:13px; margin-top:10px;">再次上传将替换当前视频。</p>
+        <div id="fileName" class="file-pill" style="display:none">
+          <span class="fp-ico">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+            </svg>
+          </span>
+          <span class="fp-text"></span>
+          <button type="button" class="fp-x" id="clearPick" title="移除">&times;</button>
+        </div>
+
+        <div class="progress" id="progressWrap" style="display:none">
+          <div class="progress-bar"><div id="progressBar"></div></div>
+          <div class="progress-pct" id="progressPct">0%</div>
+        </div>
+
+        <div class="upload-actions">
+          <button type="submit" class="btn btn-primary btn-lg" id="uploadBtn" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            开始上传
+          </button>
+          <button type="button" class="btn btn-lg" id="resetBtn">重新选择</button>
+        </div>
+      </form>
     </div>
-    {% else %}
-    <div class="current-video"><div class="empty">还没有上传任何视频</div></div>
-    {% endif %}
+
+    <div class="card tips-card">
+      <div class="tips-title">上传须知</div>
+      <ul class="tips-list">
+        <li>每支队伍仅保留 <b>一个</b> 车体视频，重新上传会自动替换旧视频。</li>
+        <li>建议使用清晰、稳定的赛道行驶录像，便于后续切分与标注。</li>
+        <li>支持 MP4 / AVI / MOV / MKV，单文件大小上限 <b>600MB</b>。</li>
+        <li>上传完成后可在下方预览，管理员可对视频统一切分导出。</li>
+      </ul>
+    </div>
   </div>
+
+  {% if current %}
+  <div class="card video-card">
+    <div class="vc-head">
+      <div class="section-title" style="margin:0;">当前视频</div>
+      <span class="tag tag-ok">已上传</span>
+    </div>
+    <video src="{{ url_for('media', video_id=current.id) }}" controls preload="metadata"></video>
+    <div class="meta-grid">
+      <div class="mg-item"><div class="mg-l">文件名</div><div class="mg-v">{{ current.original_name }}</div></div>
+      <div class="mg-item"><div class="mg-l">大小</div><div class="mg-v">{{ current.size_h }}</div></div>
+      {% if current.duration %}<div class="mg-item"><div class="mg-l">时长</div><div class="mg-v">{{ '%.1f'|format(current.duration) }} 秒</div></div>{% endif %}
+      <div class="mg-item"><div class="mg-l">上传时间</div><div class="mg-v">{{ current.uploaded_at }}</div></div>
+    </div>
+    <p class="hint replace-hint">再次选择文件并上传即可替换当前视频。</p>
+  </div>
+  {% else %}
+  <div class="card">
+    <div class="empty">
+      <div class="empty-ico">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      </div>
+      还没有上传任何视频
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 
@@ -49,9 +101,11 @@
   var dz = document.getElementById('dropzone');
   var fi = document.getElementById('fileInput');
   var nameEl = document.getElementById('fileName');
+  var nameText = nameEl.querySelector('.fp-text');
   var btn = document.getElementById('uploadBtn');
   var pw = document.getElementById('progressWrap');
   var pb = document.getElementById('progressBar');
+  var pct = document.getElementById('progressPct');
 
   dz.addEventListener('click', function () { fi.click(); });
   ['dragover', 'dragenter'].forEach(function (e) {
@@ -72,22 +126,26 @@
     return n.toFixed(1) + ' ' + u[i];
   }
 
+  function clearPick() {
+    fi.value = ''; btn.disabled = true; nameEl.style.display = 'none';
+    pw.style.display = 'none'; pb.style.width = '0%'; pct.textContent = '0%';
+  }
+
   function onPick() {
     var f = fi.files[0];
     if (!f) return;
     if (f.size > MAX) {
       showToast('文件超过 600MB 限制 (' + fmt(f.size) + ')', true);
-      fi.value = ''; btn.disabled = true; nameEl.style.display = 'none';
+      clearPick();
       return;
     }
     nameEl.style.display = 'flex';
-    nameEl.innerHTML = '<span>已选择: <b>' + f.name + '</b> (' + fmt(f.size) + ')</span>';
+    nameText.innerHTML = '<b>' + f.name + '</b> · ' + fmt(f.size);
     btn.disabled = false;
   }
 
-  document.getElementById('resetBtn').addEventListener('click', function () {
-    fi.value = ''; btn.disabled = true; nameEl.style.display = 'none';
-  });
+  document.getElementById('resetBtn').addEventListener('click', clearPick);
+  document.getElementById('clearPick').addEventListener('click', clearPick);
 
   document.getElementById('upForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -97,12 +155,17 @@
     fd.append('video', f);
     var xhr = new XMLHttpRequest();
     xhr.open('POST', '{{ url_for("upload") }}');
-    btn.disabled = true; pw.style.display = 'block';
+    btn.disabled = true; pw.style.display = 'flex';
     xhr.upload.onprogress = function (ev) {
-      if (ev.lengthComputable) { pb.style.width = (ev.loaded / ev.total * 100).toFixed(1) + '%'; }
+      if (ev.lengthComputable) {
+        var p = (ev.loaded / ev.total * 100);
+        pb.style.width = p.toFixed(1) + '%';
+        pct.textContent = p.toFixed(0) + '%';
+      }
     };
     xhr.onload = function () {
       if (xhr.status === 200) {
+        pb.style.width = '100%'; pct.textContent = '100%';
         showToast('上传成功');
         setTimeout(function () { location.reload(); }, 700);
       } else {

@@ -10,6 +10,7 @@
 部署: 0.0.0.0:8085
 """
 
+import base64
 import json
 import os
 import random
@@ -227,14 +228,22 @@ def _render_captcha(code):
     return buf
 
 
-@app.route("/captcha")
-def captcha():
+def gen_captcha_uri():
+    """生成验证码, 写入 session, 并以内嵌 data URI 形式返回 PNG。
+
+    验证码图像与页面渲染绑定 (内嵌而非独立 URL), 避免图片被浏览器/代理重复请求
+    导致 session 中的验证码与页面显示不一致。
+    """
     code = "".join(random.choice(CAPTCHA_CHARS) for _ in range(CAPTCHA_LEN))
     session["captcha"] = code.upper()
-    resp = send_file(_render_captcha(code), mimetype="image/png")
-    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    resp.headers["Pragma"] = "no-cache"
-    return resp
+    b64 = base64.b64encode(_render_captcha(code).getvalue()).decode("ascii")
+    return "data:image/png;base64," + b64
+
+
+@app.route("/captcha")
+def captcha():
+    """按需刷新验证码 (仅在用户点击刷新时调用), 返回新的 data URI。"""
+    return jsonify({"img": gen_captcha_uri()})
 
 
 def check_captcha(value):
@@ -243,6 +252,12 @@ def check_captcha(value):
     if not expected:
         return False
     return (value or "").strip().upper() == expected
+
+
+def render_auth(**kwargs):
+    """渲染队伍登录/注册页, 始终内嵌一个新的验证码。"""
+    kwargs.setdefault("captcha_img", gen_captcha_uri())
+    return render_template("auth.html", **kwargs)
 
 
 # ----------------------------------------------------------------------------
@@ -278,13 +293,13 @@ def register():
     team_name = (request.form.get("team_name") or "").strip()
     school = (request.form.get("school") or "").strip()
     if not team_name or not school:
-        return render_template("auth.html", reg_error="队伍名称和学校名称不能为空",
-                               team_name=team_name, school=school, tab="register")
+        return render_auth(reg_error="队伍名称和学校名称不能为空",
+                            team_name=team_name, school=school, tab="register")
     teams = load_teams()
     for t in teams.values():
         if t["team_name"] == team_name and t["school"] == school:
-            return render_template("auth.html", reg_error="该队伍 (队名+学校) 已注册, 请直接登录",
-                                   team_name=team_name, school=school, tab="register")
+            return render_auth(reg_error="该队伍 (队名+学校) 已注册, 请直接登录",
+                                team_name=team_name, school=school, tab="register")
     team_id = uuid.uuid4().hex[:12]
     teams[team_id] = {
         "id": team_id,
@@ -304,8 +319,8 @@ def login():
         team_name = (request.form.get("team_name") or "").strip()
         school = (request.form.get("school") or "").strip()
         if not check_captcha(request.form.get("captcha")):
-            return render_template("auth.html", login_error="验证码错误, 请重新输入",
-                                   team_name=team_name, school=school, tab="login")
+            return render_auth(login_error="验证码错误, 请重新输入",
+                                team_name=team_name, school=school, tab="login")
         teams = load_teams()
         match = None
         for t in teams.values():
@@ -313,14 +328,14 @@ def login():
                 match = t
                 break
         if not match:
-            return render_template("auth.html", login_error="队伍不存在, 请先注册或检查队名/学校",
-                                   team_name=team_name, school=school, tab="login")
+            return render_auth(login_error="队伍不存在, 请先注册或检查队名/学校",
+                                team_name=team_name, school=school, tab="login")
         session["team_id"] = match["id"]
         session["team_name"] = match["team_name"]
         return redirect(url_for("index"))
     if session.get("team_id"):
         return redirect(url_for("index"))
-    return render_template("auth.html", tab="login")
+    return render_auth(tab="login")
 
 
 @app.route("/logout")
@@ -430,7 +445,7 @@ def admin_login():
             return redirect(nxt)
         else:
             error = "用户名或密码错误"
-    return render_template("admin_login.html", error=error)
+    return render_template("admin_login.html", error=error, captcha_img=gen_captcha_uri())
 
 
 @app.route("/admin/logout")
