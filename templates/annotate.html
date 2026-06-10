@@ -10,7 +10,13 @@
         <option value="all">全部</option>
         <option value="todo">未标注</option>
         <option value="done">已标注</option>
+        <option value="excluded">已删除</option>
       </select>
+    </div>
+    <div class="frame-legend">
+      <span><i class="lg lg-done"></i>已标注</span>
+      <span><i class="lg lg-todo"></i>未标注</span>
+      <span><i class="lg lg-excl"></i>已删除</span>
     </div>
     <div id="frameList"></div>
   </div>
@@ -23,13 +29,24 @@
       <div class="tool-btn" data-tool="polygon" title="多边形 (P)">⬡</div>
       <div class="tool-btn" data-tool="point" title="关键点 (O)">•</div>
       <div class="tool-btn" data-tool="line" title="线段 (L)">／</div>
+      <div class="tool-sep"></div>
+      <div class="tool-btn tool-danger" id="excludeBtn" title="删除/恢复此图像，删除后不会导出 (X)">🗑️</div>
     </div>
+
+    <!-- 当前图像状态条 -->
+    <div class="canvas-status" id="canvasStatus">
+      <span class="cs-idx" id="curPos">0 / 0</span>
+      <span class="cs-name" id="curName">未选择图像</span>
+      <span class="cs-badge cs-excl" id="exclBadge" style="display:none;">已删除 · 不导出</span>
+    </div>
+
     <canvas id="annotCanvas"></canvas>
+
     <div class="canvas-bottom">
-      <button class="btn btn-sm" id="prevBtn">← 上一张</button>
-      <span id="curName" style="min-width:160px; text-align:center;">未选择图像</span>
-      <button class="btn btn-sm" id="nextBtn">下一张 →</button>
-      <span style="margin-left:8px;">缩放</span>
+      <button class="btn btn-sm" id="prevBtn" title="A">← 上一张 (A)</button>
+      <button class="btn btn-sm" id="nextBtn" title="D">下一张 (D) →</button>
+      <span class="cb-sep"></span>
+      <span>缩放</span>
       <button class="btn btn-sm" id="zoomOut">−</button>
       <span id="zoomLabel">100%</span>
       <button class="btn btn-sm" id="zoomIn">+</button>
@@ -39,7 +56,7 @@
 
   <!-- 右: 标签 + 形状 -->
   <div class="annot-col">
-    <div class="annot-head">标签管理</div>
+    <div class="annot-head">标签管理<span class="hd-hint">点击设为当前 · 数字键 1-9</span></div>
     <div class="add-label">
       <input type="text" id="newLabelName" placeholder="新标签名" />
       <input type="color" id="newLabelColor" value="#e6194b" />
@@ -47,7 +64,7 @@
     </div>
     <div id="labelList"></div>
 
-    <div class="annot-head" style="border-top:1px solid var(--border);">当前图像标注 (<span id="shapeCount">0</span>)</div>
+    <div class="annot-head" style="border-top:1px solid var(--border);">当前图像标注 (<span id="shapeCount">0</span>)<span class="hd-hint">选中后可改标签</span></div>
     <div id="shapeList"></div>
 
     <div class="annot-actions">
@@ -55,11 +72,14 @@
       <a class="btn btn-green" href="{{ url_for('admin_export_dataset') }}">导出数据集</a>
     </div>
     <div class="kbd-hint">
-      快捷键：<br />
+      <b>快捷键</b><br />
+      <kbd>A</kbd>/<kbd>←</kbd> 上一张　<kbd>D</kbd>/<kbd>→</kbd> 下一张<br />
       <kbd>V</kbd> 选择　<kbd>R</kbd> 矩形　<kbd>P</kbd> 多边形<br />
-      <kbd>O</kbd> 点　<kbd>L</kbd> 线　<kbd>Del</kbd> 删除选中<br />
+      <kbd>O</kbd> 点　<kbd>L</kbd> 线<br />
+      <kbd>1</kbd>…<kbd>9</kbd> 选标签 / 改选中框标签<br />
+      <kbd>Del</kbd> 删除选中框　<kbd>X</kbd> 删除/恢复整张图<br />
       <kbd>Enter</kbd> 完成多边形　<kbd>Esc</kbd> 取消<br />
-      <kbd>Ctrl+S</kbd> 保存　<kbd>←</kbd>/<kbd>→</kbd> 切换图像<br />
+      <kbd>Ctrl</kbd>+<kbd>S</kbd> 保存<br />
       滚轮缩放，按住右键拖动平移
     </div>
   </div>
@@ -71,7 +91,8 @@
   window.SMARTCAR = {
     framesUrl: "{{ url_for('api_frames') }}",
     labelsUrl: "{{ url_for('api_labels') }}",
-    annUrlBase: "/api/annotation"
+    annUrlBase: "/api/annotation",
+    excludeUrlBase: "/api/exclude"
   };
 </script>
 <script src="{{ url_for('static', filename='js/annotate.js') }}"></script>

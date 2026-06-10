@@ -10,8 +10,10 @@
 部署: 0.0.0.0:8085
 """
 
+import base64
 import json
 import os
+import random
 import shutil
 import threading
 import uuid
@@ -33,6 +35,7 @@ from flask import (
     session,
     url_for,
 )
+from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +47,7 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 VIDEOS_JSON = os.path.join(DATA_DIR, "videos.json")
 LABELS_JSON = os.path.join(DATA_DIR, "labels.json")
 TEAMS_JSON = os.path.join(DATA_DIR, "teams.json")
+EXCLUDED_JSON = os.path.join(DATA_DIR, "excluded.json")
 
 MAX_CONTENT_LENGTH = 600 * 1024 * 1024  # 600 MB
 ALLOWED_EXT = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv", ".webm", ".m4v", ".mpeg", ".mpg"}
@@ -122,6 +126,19 @@ def save_labels(labels):
     save_json(LABELS_JSON, labels)
 
 
+def excl_key(video_id, frame):
+    return f"{video_id}/{frame}"
+
+
+def load_excluded():
+    """返回被标记为「不导出/已删除」的图像键集合。"""
+    return set(load_json(EXCLUDED_JSON, []))
+
+
+def save_excluded(keys):
+    save_json(EXCLUDED_JSON, sorted(keys))
+
+
 def human_size(num):
     for unit in ("B", "KB", "MB", "GB"):
         if abs(num) < 1024.0:
@@ -176,6 +193,88 @@ def purge_video(videos, video_id):
 
 
 # ----------------------------------------------------------------------------
+# 验证码 (字母数字, 每次登录校验)
+# ----------------------------------------------------------------------------
+CAPTCHA_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 去除易混淆字符 0O1IL
+CAPTCHA_LEN = 4
+
+
+def _load_captcha_font(size):
+    for path in (
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ):
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except OSError:
+                continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _render_captcha(code):
+    """生成验证码 PNG 图像 (字母数字 + 干扰线/噪点)。"""
+    width, height = 130, 48
+    img = Image.new("RGB", (width, height), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    font = _load_captcha_font(30)
+    for _ in range(6):
+        x1, y1 = random.randint(0, width), random.randint(0, height)
+        x2, y2 = random.randint(0, width), random.randint(0, height)
+        draw.line([(x1, y1), (x2, y2)], fill=(random.randint(160, 220),) * 3, width=1)
+    for _ in range(120):
+        draw.point(
+            (random.randint(0, width), random.randint(0, height)),
+            fill=(random.randint(150, 210),) * 3,
+        )
+    step = width // (CAPTCHA_LEN + 1)
+    for i, ch in enumerate(code):
+        color = (random.randint(0, 90), random.randint(0, 90), random.randint(90, 180))
+        y = random.randint(2, 10)
+        draw.text((8 + i * step, y), ch, font=font, fill=color)
+    buf = BytesIO()
+    img.save(buf, "PNG")
+    buf.seek(0)
+    return buf
+
+
+def gen_captcha_uri():
+    """生成验证码, 写入 session, 并以内嵌 data URI 形式返回 PNG。
+
+    验证码图像与页面渲染绑定 (内嵌而非独立 URL), 避免图片被浏览器/代理重复请求
+    导致 session 中的验证码与页面显示不一致。
+    """
+    code = "".join(random.choice(CAPTCHA_CHARS) for _ in range(CAPTCHA_LEN))
+    session["captcha"] = code.upper()
+    b64 = base64.b64encode(_render_captcha(code).getvalue()).decode("ascii")
+    return "data:image/png;base64," + b64
+
+
+@app.route("/captcha")
+def captcha():
+    """按需刷新验证码 (仅在用户点击刷新时调用), 返回新的 data URI。"""
+    return jsonify({"img": gen_captcha_uri()})
+
+
+def check_captcha(value):
+    """校验用户输入的验证码 (不区分大小写), 校验后立即失效。"""
+    expected = session.pop("captcha", None)
+    if not expected:
+        return False
+    return (value or "").strip().upper() == expected
+
+
+def render_auth(**kwargs):
+    """渲染队伍登录/注册页, 始终内嵌一个新的验证码。"""
+    kwargs.setdefault("captcha_img", gen_captcha_uri())
+    return render_template("auth.html", **kwargs)
+
+
+# ----------------------------------------------------------------------------
 # 认证
 # ----------------------------------------------------------------------------
 def admin_required(f):
@@ -208,13 +307,13 @@ def register():
     team_name = (request.form.get("team_name") or "").strip()
     school = (request.form.get("school") or "").strip()
     if not team_name or not school:
-        return render_template("auth.html", reg_error="队伍名称和学校名称不能为空",
-                               team_name=team_name, school=school, tab="register")
+        return render_auth(reg_error="队伍名称和学校名称不能为空",
+                            team_name=team_name, school=school, tab="register")
     teams = load_teams()
     for t in teams.values():
         if t["team_name"] == team_name and t["school"] == school:
-            return render_template("auth.html", reg_error="该队伍 (队名+学校) 已注册, 请直接登录",
-                                   team_name=team_name, school=school, tab="register")
+            return render_auth(reg_error="该队伍 (队名+学校) 已注册, 请直接登录",
+                                team_name=team_name, school=school, tab="register")
     team_id = uuid.uuid4().hex[:12]
     teams[team_id] = {
         "id": team_id,
@@ -233,6 +332,9 @@ def login():
     if request.method == "POST":
         team_name = (request.form.get("team_name") or "").strip()
         school = (request.form.get("school") or "").strip()
+        if not check_captcha(request.form.get("captcha")):
+            return render_auth(login_error="验证码错误, 请重新输入",
+                                team_name=team_name, school=school, tab="login")
         teams = load_teams()
         match = None
         for t in teams.values():
@@ -240,14 +342,14 @@ def login():
                 match = t
                 break
         if not match:
-            return render_template("auth.html", login_error="队伍不存在, 请先注册或检查队名/学校",
-                                   team_name=team_name, school=school, tab="login")
+            return render_auth(login_error="队伍不存在, 请先注册或检查队名/学校",
+                                team_name=team_name, school=school, tab="login")
         session["team_id"] = match["id"]
         session["team_name"] = match["team_name"]
         return redirect(url_for("index"))
     if session.get("team_id"):
         return redirect(url_for("index"))
-    return render_template("auth.html", tab="login")
+    return render_auth(tab="login")
 
 
 @app.route("/logout")
@@ -349,12 +451,15 @@ def admin_login():
     if request.method == "POST":
         username = request.form.get("username", "")
         password = request.form.get("password", "")
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        if not check_captcha(request.form.get("captcha")):
+            error = "验证码错误, 请重新输入"
+        elif username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session["is_admin"] = True
             nxt = request.args.get("next") or url_for("admin_dashboard")
             return redirect(nxt)
-        error = "用户名或密码错误"
-    return render_template("admin_login.html", error=error)
+        else:
+            error = "用户名或密码错误"
+    return render_template("admin_login.html", error=error, captcha_img=gen_captcha_uri())
 
 
 @app.route("/admin/logout")
@@ -505,11 +610,14 @@ def _export_base(info, vid):
 def admin_export_images():
     """导出整个图像数据集为 zip (一个 images 文件夹, 包含所有图像)。"""
     videos = load_videos()
+    excluded = load_excluded()
     mem = BytesIO()
     with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
         for vid, info in videos.items():
             base = _export_base(info, vid)
             for frame in frames_for(vid):
+                if excl_key(vid, frame) in excluded:
+                    continue
                 src = os.path.join(FRAMES_DIR, vid, frame)
                 zf.write(src, os.path.join("images", f"{base}__{frame}"))
     mem.seek(0)
@@ -527,11 +635,14 @@ def admin_export_images():
 def admin_export_dataset():
     """导出图像 + 标注 (LabelMe 风格 json) 的完整数据集。"""
     videos = load_videos()
+    excluded = load_excluded()
     mem = BytesIO()
     with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
         for vid, info in videos.items():
             base = _export_base(info, vid)
             for frame in frames_for(vid):
+                if excl_key(vid, frame) in excluded:
+                    continue
                 src = os.path.join(FRAMES_DIR, vid, frame)
                 stem = os.path.splitext(frame)[0]
                 zf.write(src, os.path.join("images", f"{base}__{frame}"))
@@ -563,6 +674,7 @@ def annotate():
 def api_frames():
     """返回所有可标注的帧 (跨所有队伍/视频)。"""
     videos = load_videos()
+    excluded = load_excluded()
     result = []
     for v in sorted(videos.values(), key=lambda x: x["uploaded_at"]):
         vid = v["id"]
@@ -582,9 +694,28 @@ def api_frames():
                     "url": url_for("admin_frame", video_id=vid, frame=frame),
                     "annotated": n_shapes > 0,
                     "shapes": n_shapes,
+                    "excluded": excl_key(vid, frame) in excluded,
                 }
             )
     return jsonify({"frames": result, "count": len(result)})
+
+
+@app.route("/api/exclude/<video_id>/<frame>", methods=["POST"])
+@admin_required
+def api_exclude(video_id, frame):
+    """标记/取消标记某图像为「删除(不作为数据集导出)」。"""
+    videos = load_videos()
+    if video_id not in videos:
+        return jsonify({"error": "视频不存在"}), 404
+    data = request.get_json(silent=True) or {}
+    excluded = load_excluded()
+    key = excl_key(video_id, frame)
+    if data.get("excluded"):
+        excluded.add(key)
+    else:
+        excluded.discard(key)
+    save_excluded(excluded)
+    return jsonify({"ok": True, "excluded": key in excluded})
 
 
 @app.route("/api/labels", methods=["GET", "POST", "DELETE"])

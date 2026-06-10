@@ -84,6 +84,13 @@
       drawShape(sh, i === state.selectedShape);
     });
     if (state.drawing) drawShape(state.drawing, true, true);
+
+    if (state.cur && state.cur.excluded) {
+      ctx.save();
+      ctx.fillStyle = "rgba(220,53,69,0.16)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
   }
 
   function drawShape(sh, selected, preview) {
@@ -310,15 +317,17 @@
   function renderLabels() {
     var box = document.getElementById("labelList");
     box.innerHTML = "";
-    state.labels.forEach(function (l) {
+    state.labels.forEach(function (l, idx) {
       var row = document.createElement("div");
       row.className = "label-row" + (l.name === state.activeLabel ? " sel" : "");
+      var keyBadge = idx < 9 ? '<span class="key">' + (idx + 1) + "</span>" : '<span class="key"></span>';
       row.innerHTML =
+        keyBadge +
         '<span class="sw" style="background:' + l.color + '"></span>' +
         '<span class="nm">' + escapeHtml(l.name) + "</span>" +
         '<span class="x" title="删除">&times;</span>';
-      row.querySelector(".nm").addEventListener("click", function () { state.activeLabel = l.name; renderLabels(); });
-      row.querySelector(".sw").addEventListener("click", function () { state.activeLabel = l.name; renderLabels(); });
+      row.querySelector(".nm").addEventListener("click", function () { pickLabel(l.name); });
+      row.querySelector(".sw").addEventListener("click", function () { pickLabel(l.name); });
       row.querySelector(".x").addEventListener("click", function (e) {
         e.stopPropagation();
         if (!confirm("删除标签 " + l.name + " ?")) return;
@@ -338,34 +347,111 @@
       .catch(function (err) { showToast(err.message, true); });
   });
 
+  // 选择/重指派标签: 若已选中某形状则改其标签, 否则设为当前绘制标签
+  function pickLabel(name) {
+    if (state.selectedShape >= 0) {
+      setLabelForShape(state.selectedShape, name);
+    }
+    state.activeLabel = name;
+    renderAll();
+  }
+  function setLabelForShape(i, name) {
+    if (i < 0 || i >= state.shapes.length) return;
+    state.shapes[i].label = name;
+    state.shapes[i].color = labelColor(name);
+    state.dirty = true;
+    renderAll();
+  }
+  function selectLabelByIndex(idx) {
+    var l = state.labels[idx];
+    if (l) pickLabel(l.name);
+  }
+
   // ---- 形状列表 ----
   function renderShapes() {
     var box = document.getElementById("shapeList");
     box.innerHTML = "";
     document.getElementById("shapeCount").textContent = state.shapes.length;
+    if (!state.shapes.length) {
+      box.innerHTML = '<div class="empty-row">暂无标注。选好标签后在画布上绘制。</div>';
+      return;
+    }
+    var typeName = { rectangle: "矩形", polygon: "多边形", point: "点", line: "线" };
     state.shapes.forEach(function (sh, i) {
       var row = document.createElement("div");
       row.className = "shape-row" + (i === state.selectedShape ? " sel" : "");
-      if (i === state.selectedShape) row.style.background = "#eef4ff";
-      var typeName = { rectangle: "矩形", polygon: "多边形", point: "点", line: "线" }[sh.shape_type] || sh.shape_type;
-      row.innerHTML =
-        '<span class="sw" style="background:' + (sh.color || labelColor(sh.label)) + '"></span>' +
-        '<span class="nm">' + escapeHtml(sh.label) + " · " + typeName + "</span>" +
-        '<span class="x" title="删除">🗑️</span>';
-      row.querySelector(".nm").addEventListener("click", function () { state.selectedShape = i; renderAll(); });
-      row.querySelector(".x").addEventListener("click", function () { state.shapes.splice(i, 1); state.selectedShape = -1; state.dirty = true; renderAll(); });
+
+      var sw = document.createElement("span");
+      sw.className = "sw";
+      sw.style.background = sh.color || labelColor(sh.label);
+
+      var sel = document.createElement("select");
+      sel.className = "shape-label-sel";
+      state.labels.forEach(function (l) {
+        var op = document.createElement("option");
+        op.value = l.name; op.textContent = l.name;
+        if (l.name === sh.label) op.selected = true;
+        sel.appendChild(op);
+      });
+      if (!state.labels.some(function (l) { return l.name === sh.label; })) {
+        var cur = document.createElement("option");
+        cur.value = sh.label; cur.textContent = sh.label; cur.selected = true;
+        sel.appendChild(cur);
+      }
+      sel.addEventListener("mousedown", function (e) { e.stopPropagation(); state.selectedShape = i; renderAll(); });
+      sel.addEventListener("change", function () { setLabelForShape(i, sel.value); });
+
+      var ty = document.createElement("span");
+      ty.className = "ty";
+      ty.textContent = typeName[sh.shape_type] || sh.shape_type;
+
+      var del = document.createElement("span");
+      del.className = "x"; del.title = "删除此框"; del.textContent = "🗑️";
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        state.shapes.splice(i, 1); state.selectedShape = -1; state.dirty = true; renderAll();
+      });
+
+      row.appendChild(sw); row.appendChild(sel); row.appendChild(ty); row.appendChild(del);
+      row.addEventListener("click", function () { state.selectedShape = i; renderAll(); });
       box.appendChild(row);
     });
   }
 
-  function renderAll() { renderShapes(); renderLabels(); render(); }
+  function renderAll() { renderShapes(); renderLabels(); render(); updateStatus(); }
+
+  // ---- 状态条 / 删除图像 ----
+  function updateStatus() {
+    document.getElementById("curPos").textContent =
+      state.cur ? (state.curIndex + 1) + " / " + state.filtered.length : "0 / 0";
+    var excl = !!(state.cur && state.cur.excluded);
+    document.getElementById("exclBadge").style.display = excl ? "" : "none";
+    document.getElementById("excludeBtn").classList.toggle("active", excl);
+  }
+
+  function toggleExclude() {
+    if (!state.cur) { showToast("请先选择图像", true); return; }
+    var newVal = !state.cur.excluded;
+    api(CFG.excludeUrlBase + "/" + state.cur.video_id + "/" + encodeURIComponent(state.cur.frame),
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ excluded: newVal }) })
+      .then(function (d) {
+        state.cur.excluded = d.excluded;
+        var fr = state.frames.find(function (x) { return x.video_id === state.cur.video_id && x.frame === state.cur.frame; });
+        if (fr) fr.excluded = d.excluded;
+        showToast(d.excluded ? "已删除此图（不会导出）" : "已恢复此图");
+        renderFrameList(); render(); updateStatus();
+      })
+      .catch(function (err) { showToast(err.message, true); });
+  }
+  document.getElementById("excludeBtn").addEventListener("click", toggleExclude);
 
   // ---- 帧列表 ----
   function renderFrameList() {
     var f = document.getElementById("filterSel").value;
     state.filtered = state.frames.filter(function (fr) {
-      if (f === "todo") return !fr.annotated;
+      if (f === "todo") return !fr.annotated && !fr.excluded;
       if (f === "done") return fr.annotated;
+      if (f === "excluded") return fr.excluded;
       return true;
     });
     var box = document.getElementById("frameList");
@@ -374,7 +460,7 @@
     state.filtered.forEach(function (fr) {
       var row = document.createElement("div");
       var isCur = state.cur && state.cur.video_id === fr.video_id && state.cur.frame === fr.frame;
-      row.className = "frame-item" + (fr.annotated ? " done" : "") + (isCur ? " active" : "");
+      row.className = "frame-item" + (fr.annotated ? " done" : "") + (fr.excluded ? " excluded" : "") + (isCur ? " active" : "");
       row.innerHTML =
         '<span class="dot"></span>' +
         '<div style="overflow:hidden;"><div class="nm">' + escapeHtml(fr.frame) + "</div>" +
@@ -392,6 +478,7 @@
     state.curIndex = state.filtered.indexOf(fr);
     state.selectedShape = -1; state.drawing = null;
     document.getElementById("curName").textContent = fr.frame;
+    updateStatus();
     var img = new Image();
     img.onload = function () {
       state.img = img;
@@ -462,12 +549,15 @@
     else if (e.key === "p" || e.key === "P") setTool("polygon");
     else if (e.key === "o" || e.key === "O") setTool("point");
     else if (e.key === "l" || e.key === "L") setTool("line");
+    else if (e.key === "x" || e.key === "X") toggleExclude();
+    else if (e.key === "a" || e.key === "A" || e.key === "ArrowLeft") nav(-1);
+    else if (e.key === "d" || e.key === "D" || e.key === "ArrowRight") nav(1);
+    else if (/^[1-9]$/.test(e.key)) selectLabelByIndex(parseInt(e.key, 10) - 1);
     else if (e.key === "Enter") finishPolygon();
-    else if (e.key === "Escape") { state.drawing = null; render(); }
+    else if (e.key === "Escape") { state.drawing = null; state.selectedShape = -1; renderAll(); }
     else if (e.key === "Delete" || e.key === "Backspace") {
       if (state.selectedShape >= 0) { state.shapes.splice(state.selectedShape, 1); state.selectedShape = -1; state.dirty = true; renderAll(); }
-    } else if (e.key === "ArrowLeft") nav(-1);
-    else if (e.key === "ArrowRight") nav(1);
+    }
   });
 
   window.addEventListener("beforeunload", function (e) {
